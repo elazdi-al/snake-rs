@@ -7,7 +7,7 @@ use std::{
 
 use termion::{
     async_stdin, clear,
-    color::{self, Bg, Reset, White},
+    color::{self, Bg, Red, Reset, White},
     cursor::{Goto, Hide, Show},
     event::Key,
     input::TermRead,
@@ -20,6 +20,33 @@ const PADDING: u16 = 3;
 
 const BACKGROUND_COLOR: Bg<White> = Bg(White);
 const RESET_COLOR: Bg<Reset> = Bg(Reset);
+const SNAKE_COLOR: Bg<Red> = Bg(Red);
+const SNAKE_HEAD: &str = "●";
+const SNAKE_BODY: &str = "●";
+const SNAKE_TAIL: &str = "●";
+
+struct Position {
+    x: u16,
+    y: u16,
+}
+impl Position {
+    fn new(x: u16, y: u16) -> io::Result<Self> {
+        Ok(Self { x, y })
+    }
+}
+struct Snake {
+    positions: Vec<Position>,
+}
+impl Snake {
+    fn new() -> io::Result<Self> {
+        let positions = vec![
+            Position::new(5, 5).unwrap(),
+            Position::new(5, 6).unwrap(),
+            Position::new(5, 7).unwrap(),
+        ];
+        Ok(Self { positions })
+    }
+}
 
 struct GameView {
     buffer: String,
@@ -38,19 +65,6 @@ impl GameView {
         })
     }
 
-    fn update_size(&mut self) {
-        if let Ok((w, h)) = terminal_size() {
-            if w != self.width || h != self.height {
-                self.width = w;
-                self.height = h;
-                self.buffer.clear();
-                let capacity = (w as usize * h as usize) * 2;
-                self.buffer
-                    .reserve(capacity.saturating_sub(self.buffer.capacity()));
-            }
-        }
-    }
-
     fn goto(&mut self, x: u16, y: u16) -> &mut Self {
         let _ = write!(&mut self.buffer, "{}", Goto(x, y));
         self
@@ -66,6 +80,11 @@ impl GameView {
         self
     }
 
+    fn draw_box(&mut self, x: u16, y: u16) -> &mut Self {
+        self.goto(x, y);
+        self.buffer.push(' ');
+        self
+    }
     fn draw_rect(&mut self, padding: u16) -> &mut Self {
         if self.width <= padding * 2 || self.height <= padding * 2 {
             return self;
@@ -89,6 +108,22 @@ impl GameView {
     fn set_desc(&mut self, description: &str) -> &mut Self {
         self.goto(PADDING, self.height);
         write!(&mut self.buffer, "{}", description).unwrap();
+        self.goto(1, 1);
+        self
+    }
+    fn render_snake(&mut self, snake: &Snake) -> &mut Self {
+        let positions_size = snake.positions.len();
+        for i in 0..positions_size {
+            let position: &Position = snake.positions.get(i).unwrap();
+            let render = match i {
+                0 => SNAKE_HEAD,
+                positions_size => SNAKE_TAIL, // must be changed to positions_size - 1
+                _ => SNAKE_BODY,
+            };
+            self.goto(position.x, position.y);
+            write!(&mut self.buffer, "{}{}", BACKGROUND_COLOR, render).unwrap();
+        }
+        self.goto(1, 1);
         self
     }
 
@@ -107,21 +142,27 @@ fn run() -> io::Result<()> {
 
     let mut view = GameView::new()?;
     let mut stdin = async_stdin().keys();
+    let mut snake: Snake = Snake::new()?;
 
     loop {
         if let Some(Ok(key)) = stdin.next() {
             if let Key::Char('q') = key {
                 break;
             }
+            if let Key::Up = key {}
+            if let Key::Down = key {}
+            if let Key::Right = key {}
+            if let Key::Left = key {}
         }
-
-        view.update_size();
 
         view.goto(1, 1)
             .set_bg_color(BACKGROUND_COLOR)
             .draw_rect(PADDING)
             .reset_color()
-            .set_desc("press q to quit");
+            .set_desc("press q to quit")
+            .set_bg_color(SNAKE_COLOR)
+            .draw_box(5, 5)
+            .render_snake(&snake);
 
         view.render(&mut stdout)?;
         sleep(WAIT);
